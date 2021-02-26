@@ -38,7 +38,7 @@ MODULES=("overlay" "squashfs")
 PACKAGES=(# Bluetooth packages
 	"bluez" "bluez-firmware" "pi-bluetooth"
 	# Foundation stuff
-	"raspberrypi-sys-mods"
+	"raspberrypi-sys-mods" "libraspberrypi0"
 	# "rpi-eeprom"\ Needs raspberrypi-bootloader that we hold back
 	# GPIO stuff
 	"wiringpi"
@@ -89,22 +89,6 @@ device_image_tweaks() {
 		deb http://archive.raspberrypi.org/debian/ buster main ui
 		# Uncomment line below then 'apt-get update' to enable 'apt-get source'
 		#deb-src http://archive.raspberrypi.org/debian/ buster main ui
-	EOF
-
-	# raspberrypi-{kernel,bootloader} packages update kernel & firmware files
-	# and break Volumio. Installation may be triggered by manual or
-	# plugin installs explicitly or through dependencies like
-	# chromium, sense-hat, picamera,...
-	# Using Pin-Priority < 0 prevents installation
-	log "Blocking raspberrypi-bootloader and raspberrypi-kernel"
-	cat <<-EOF >"${ROOTFSMNT}/etc/apt/preferences.d/raspberrypi-kernel"
-		Package: raspberrypi-bootloader
-		Pin: release *
-		Pin-Priority: -1
-
-		Package: raspberrypi-kernel
-		Pin: release *
-		Pin-Priority: -1
 	EOF
 
 	log "Fetching rpi-update" "info"
@@ -183,12 +167,23 @@ device_chroot_tweaks_pre() {
 		rm -rf "/lib/modules/${KERNEL_VERSION}-v8+"
 	fi
 
+	# raspberrypi-{kernel,bootloader} packages update kernel & firmware files and break Volumio.
+	# Installation may be triggered by manual or plugin installs explicitly or through dependencies like chromium, sense-hat, picamera,...
+	# Using Pin-Priority < 0 prevents installation
+	log "Blocking raspberrypi-bootloader and raspberrypi-kernel"
+	cat <<-EOF >/etc/apt/preferences.d/raspberrypi-kernel
+		Package: raspberrypi-bootloader
+		Pin: release *
+		Pin-Priority: -1
+
+		Package: raspberrypi-kernel
+		Pin: release *
+		Pin-Priority: -1
+	EOF
 	log "Finished Kernel installation" "okay"
 
 	### Other Rpi specific stuff
-	## Lets update some packages from raspbian repos now
-	apt-get update && apt-get -y upgrade
-
+	## Fetch NodeJS for armv6
 	NODE_VERSION=$(node --version)
 	log "Node version installed:" "dbg" "${NODE_VERSION}"
 	# drop the leading v
@@ -225,6 +220,9 @@ device_chroot_tweaks_pre() {
 			Pin-Priority: -1
 		EOF
 	fi
+
+	## Lets update some packages from raspbian repos now
+	apt-get update && apt-get -y upgrade
 
 	log "Adding Custom DAC firmware from github" "info"
 	for key in "${!CustomFirmware[@]}"; do
