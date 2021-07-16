@@ -84,9 +84,9 @@ device_image_tweaks() {
 
 	log "Adding archive.raspberrypi debian repo"
 	cat <<-EOF >"${ROOTFSMNT}/etc/apt/sources.list.d/raspi.list"
-		deb http://archive.raspberrypi.org/debian/ buster main ui
+		deb http://archive.raspberrypi.org/debian/ ${SUITE} main ui
 		# Uncomment line below then 'apt-get update' to enable 'apt-get source'
-		#deb-src http://archive.raspberrypi.org/debian/ buster main ui
+		#deb-src http://archive.raspberrypi.org/debian/ ${SUITE} main ui
 	EOF
 
 	log "Fetching rpi-update" "info"
