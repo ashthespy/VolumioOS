@@ -39,7 +39,7 @@ PACKAGES=(# Bluetooth packages
 	# Foundation stuff
 	"raspberrypi-sys-mods" "libraspberrypi0" "rpi-eeprom"
 	# GPIO stuff
-	"wiringpi"
+	# "wiringpi"
 	# Boot splash
 	"plymouth" "plymouth-themes"
 	# Wireless firmware
@@ -151,7 +151,7 @@ device_chroot_tweaks_pre() {
 	# List of custom firmware -
 	# github archives that can be extracted directly
 	declare -A CustomFirmware=(
-		[AlloPiano]="https://github.com/allocom/piano-firmware/archive/master.tar.gz"
+		# [AlloPiano]="https://github.com/allocom/piano-firmware/archive/master.tar.gz" // Should be in tree now
 		[TauDAC]="https://github.com/taudac/modules/archive/rpi-volumio-${KERNEL_VERSION}-taudac-modules.tar.gz"
 		[Bassowl]="https://raw.githubusercontent.com/Darmur/bassowl-hat/master/driver/archives/modules-rpi-${KERNEL_VERSION}-bassowl.tar.gz"
 		[wm8960]="https://raw.githubusercontent.com/hftsai256/wm8960-rpi-modules/main/wm8960-modules-rpi-${KERNEL_VERSION}.tar.gz"
@@ -307,7 +307,7 @@ device_chroot_tweaks_pre() {
 		"tvservice" "vcdbg" "vcgencmd" "vchiq_test"
 		"dtoverlay" "dtoverlay-pre" "dtoverlay-post" "dtmerge")
 	for bin in "${VC_BINS[@]}"; do
-		ln -s "/opt/vc/bin/${bin}" "/usr/bin/${bin}"
+		[[ ! -e "/usr/bin/${bin}" ]] && ln -s "/opt/vc/bin/${bin}" "/usr/bin/${bin}"
 	done
 
 	log "Fixing vcgencmd permissions"
