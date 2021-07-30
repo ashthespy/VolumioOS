@@ -1,5 +1,5 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
+# This script runs in chroot, to configure the freshly created rootfs from multistrap
 # This script will be run in chroot under qemu.
 
 set -eo pipefail
@@ -166,6 +166,7 @@ EOF
 #Sudoers Nopasswd
 SUDOERS_FILE="/etc/sudoers.d/volumio-user"
 log 'Adding Safe Sudoers NoPassw permissions'
+#TODO: Prune old/repeated entries..
 cat <<-EOF >${SUDOERS_FILE}
 # Add permissions for volumio user
 volumio ALL=(ALL) ALL
