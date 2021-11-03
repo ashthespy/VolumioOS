@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Central location for Build System configuration(s)
+# Location for configuration(s) for rootfs and image creation
 
 declare -A SecureApt=(
   [debian_10.gpg]="https://ftp-master.debian.org/keys/archive-key-10.asc"
@@ -34,13 +34,13 @@ declare -A CUSTOM_PKGS=(
   [libnpupnp1]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/upmpdcli/libnpupnp1_4.0.14-1"
   [libupnpp6]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/upmpdcli/libupnpp6_0.20.2-1"
   [upmpdcli]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/upmpdcli/upmpdcli_1.5.8-1"
-  [shairport-sync]="https://github.com/volumio/volumio3-os-static-assets/blob/master/custom-packages/shairport-sync/shairport-sync_3.2.2-1"
-  [mpd]="https://github.com/volumio/volumio3-os-static-assets/blob/master/custom-packages/mpd/mpd_0.21.18"
+  [shairport - sync]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/shairport-sync/shairport-sync_3.2.2-1"
+  [mpd]="https://github.com/volumio/volumio3-os-static-assets/raw/master/custom-packages/mpd/mpd_0.21.18"
 )
 
 ## Backend and Frontend Repository details
-VOL_BE_REPO="https://github.com/volumio/Volumio2.git"
-VOL_BE_REPO_BRANCH="buster/master"
+VOL_BE_REPO="https://github.com/volumio/volumio3-backend.git"
+VOL_BE_REPO_BRANCH="master"
 # VOL_BE_REPO_SHA="d7a5678" # Workaround for BE repo having incompatible package.json for Node v8
 
 ## NodeJS Controls
