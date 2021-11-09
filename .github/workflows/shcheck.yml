@@ -28,4 +28,4 @@ jobs:
         uses: ashthespy/action-shell@v1
         with:
           only_changed: "true"
-          shfmt_flags: "-i 2 -d"
+          shfmt_flags: "-i=0 -d"
