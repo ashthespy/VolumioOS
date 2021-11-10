@@ -111,6 +111,11 @@ buster)
   ;;
 esac
 
+# Don't start MPD until the backend is ready
+log "Disabling mpd autostart"
+systemctl disable mpd.service
+systemctl disable mpd.socket
+
 #First Boot operations
 log "Signalling the init script to re-size the Volumio data partition"
 touch /boot/resize-volumio-datapart
