@@ -71,6 +71,10 @@ log "Updating MOTD"
 rm -f "${ROOTFSMNT}"/etc/motd "${ROOTFSMNT}"/etc/update-motd.d/*
 cp "${SRC}"/volumio/etc/update-motd.d/* "${ROOTFSMNT}"/etc/update-motd.d/
 
+# Don't start MPD until the backend is ready
+systemctl disable mpd.service
+systemctl disable mpd.socket
+
 #TODO This shall be refactored as per https://github.com/volumio/Build/issues/479
 # Temporary workaround
 log "Copying over upmpdcli.service"
