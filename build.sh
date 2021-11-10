@@ -534,7 +534,7 @@ if [[ -n "${DEVICE}" ]]; then
   log "Adding custom Packages and Modules" "info"
   if [[ ${USE_LOCAL_NODE_MODULES} == yes ]]; then
     log "Extracting node_modules for Node v${NODE_VERSION}"
-    tar xf "${LOCAL_MODULES_DIR}/node_modules_${BUILD}"_v${NODE_VERSION%%.*}.*.tar.xz -C "${ROOTFS}/volumio"
+    tar xf "${LOCAL_MODULES_DIR}/node_modules_${BUILD}"_v${NODE_VERSION%%.*}.*.tar.* -C "${ROOTFS}/volumio"
     ls "${ROOTFS}/volumio/node_modules"
   else
     # Current Volumio repo knows only {arm|x86} which is conveniently the same length
