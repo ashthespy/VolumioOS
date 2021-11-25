@@ -495,8 +495,12 @@ build_volumio_initramfs() {
 
   num_ker_max=3
 
-  log "Found ${#versions[@]} kernel version(s)" "${versions[@]}"
+  log "Found ${#versions[@]} kernel version(s)" "${versions[*]}"
   for ver in "${!versions[@]}"; do
+    if [[ $ver -gt $num_ker_max ]]; then
+      log "Using only ${num_ker_max} kernels" "wrn"
+      break
+    fi
     log "Building intramsfs for Kernel[${ver}]: ${versions[ver]}" "info"
     build_initramfs "${versions[ver]}"
     log "initramfs built for Kernel[${ver}]: ${versions[ver]} at ${DESTDIR}" "okay"
@@ -507,10 +511,6 @@ build_volumio_initramfs() {
       log "Copying modules from ${DESTDIR} to ${DESTDIR_VOL}"
       cp -rf "${DESTDIR}/lib/modules/${versions[ver]}" \
         "${DESTDIR_VOL}/lib/modules/${versions[ver]}"
-    fi
-    if [[ $ver -gt $num_ker_max-1 ]]; then
-      log "Using only ${num_ker_max} kernels" "wrn"
-      break
     fi
   done
   # Set correct final tmp/mkinitramfs_XXXXXX

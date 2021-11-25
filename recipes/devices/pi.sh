@@ -43,7 +43,7 @@ PACKAGES=(# Bluetooth packages
 	# Boot splash
 	"plymouth" "plymouth-themes"
 	# Wireless firmware
-	"firmware-atheros" "firmware-ralink" "firmware-realtek" "firmware-brcm80211"
+	"firmware-misc-nonfree" "firmware-atheros" "firmware-ralink" "firmware-realtek" "firmware-brcm80211"
 )
 
 ### Device customisation
@@ -80,13 +80,13 @@ device_image_tweaks() {
 
 	log "Adding archive.raspberrypi debian repo"
 	cat <<-EOF >"${ROOTFSMNT}/etc/apt/sources.list.d/raspi.list"
-		deb http://archive.raspberrypi.org/debian/ ${SUITE} main ui
+		deb http://archive.raspberrypi.org/debian/ ${SUITE} main
 		# Uncomment line below then 'apt-get update' to enable 'apt-get source'
-		#deb-src http://archive.raspberrypi.org/debian/ ${SUITE} main ui
+		#deb-src http://archive.raspberrypi.org/debian/ ${SUITE} main
 	EOF
 
 	log "Fetching rpi-update" "info"
-	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" https://raw.githubusercontent.com/volumio/rpi-update/master/rpi-update &&
+	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" https://github.com/raspberrypi/rpi-update/raw/master/rpi-update &&
 		chmod +x "${ROOTFSMNT}/usr/bin/rpi-update"
 	#TODO: Look into moving kernel stuff outside chroot using ROOT/BOOT_PATH to speed things up
 	# ROOT_PATH=${ROOTFSMNT}
@@ -117,6 +117,7 @@ device_chroot_tweaks_pre() {
 		[5.4.83]="b7c8ef64ea24435519f05c38a2238658908c038e|stable|1379"
 		[5.10.3]="da59cb1161dc7c75727ec5c7636f632c52170961|master|1386"
 		[5.10.73]="1597995e94e7ba3cd8866d249e6df1cf9a790e49|master|1470"
+		[5.15.4]="294100a885e17bf5a7f5ac275528ca5ab4c915ba|next|1489"
 	)
 	# Version we want
 	KERNEL_VERSION="5.4.83"
@@ -124,7 +125,7 @@ device_chroot_tweaks_pre() {
 	# For bleeding edge, check what is the latest on offer
 	# Things *might* break, so you are warned!
 	if [[ ${RPI_USE_LATEST_KERNEL:-no} == yes ]]; then
-		branch=master
+		branch=${RPI_KERNEL_BRANCH:-master}
 		log "Using bleeding edge Rpi kernel" "info" "$branch"
 		RpiRepo="https://github.com/raspberrypi/rpi-firmware"
 		RpiRepoApi=${RpiRepo/github.com/api.github.com\/repos}
@@ -160,6 +161,8 @@ device_chroot_tweaks_pre() {
 	# using rpi-update to fetch and install kernel and firmware
 	log "Adding kernel ${KERNEL_VERSION} using rpi-update" "info"
 	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}"
+	#TODO: I don't seem to find a way to fetch only firmware for the Pi4, and not the kernel.. WANT_PI4 isn't granular enough with SKIP_KERNEL
+	# PRUNE_MODULES=1
 	echo y | SKIP_BACKUP=1 WANT_PI4=1 SKIP_CHECK_PARTITION=1 UPDATE_SELF=0 BRANCH=${KERNEL_BRANCH} /usr/bin/rpi-update "${KERNEL_COMMIT}"
 
 	if [[ -d "/lib/modules/${KERNEL_VERSION}-v8+" ]]; then
