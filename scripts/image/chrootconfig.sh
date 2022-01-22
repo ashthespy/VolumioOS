@@ -38,12 +38,12 @@ tmpfs           /tmp                 tmpfs   defaults,noatime,mode=0755         
 tmpfs           /dev/shm             tmpfs   defaults,nosuid,noexec,nodev              0 0
 EOF
 
-if [ $BUILD == "armv8" ]; then
+if [[ ${BUILD} == "armv8" ]]; then
   log "Adding multiarch support for armv8 to support armhf packages"
   dpkg --add-architecture armhf
 fi
 
-if [ $BUILD == "x64" ]; then
+if [[ ${BUILD} == "x64" ]]; then
   log "Adding multiarch support for x64 to support i386  packages"
   dpkg --add-architecture i386
 fi
@@ -114,8 +114,8 @@ esac
 
 # Don't start MPD until the backend is ready
 log "Disabling mpd autostart"
-systemctl disable mpd.service
-systemctl disable mpd.socket
+# mpd.socket is linked via `Also=` so be aware
+systemctl stop mpd.service
 
 #First Boot operations
 log "Signalling the init script to re-size the Volumio data partition"
