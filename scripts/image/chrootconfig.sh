@@ -100,6 +100,13 @@ sed -i '/^ExecStart=.*/i ExecStartPre=mkdir -m 700 -p /var/log/samba/cores' /lib
 
 log "Checking for ${DISTRO_NAME} sepecific tweaks" "info"
 case "${DISTRO_NAME}" in
+bullseye)
+  log "No tweaks yet!" "wrn"
+  #   cat <<-EOF >>/lib/systemd/system/mpd.service
+  #   # for io_uring
+  #   LimitMEMLOCK=64M
+  # EOF
+  ;;
 buster)
   log "Applying {n,s}mbd.service PID tweaks"
   # Fix for https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=934540

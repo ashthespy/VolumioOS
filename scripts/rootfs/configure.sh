@@ -44,6 +44,10 @@ cp "${SRC}/volumio/etc/ssh/sshd_config" "${ROOTFS}/etc/ssh/sshd_config"
 cp "${SRC}/volumio/etc/systemd/journald.conf" "${ROOTFS}/etc/systemd/journald.conf"
 
 #Volumio SystemD Services
+# The amount of time I've spend debugging strange things only to realise we overwrite everything with these files.
+for service in "${SRC}"/volumio/lib/systemd/system/*.service; do
+  log "Copying ${service}"
+done
 cp -r "${SRC}"/volumio/lib "${ROOTFS}"/
 
 # Network
