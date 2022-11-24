@@ -8,7 +8,12 @@ DEVICE_STATUS="T"       # First letter (Planned|Test|Maintenance)
 BASE="Raspbian"
 ARCH="armhf"
 BUILD="arm"
-
+if [[ ${RPI_USE_64BIT:no} == yes ]]; then
+	# Base system
+	BASE="Debian"
+	ARCH="arm64"
+	BUILD="armv8"
+fi
 ### Device information
 # Used to identify devices (VOLUMIO_HARDWARE) and keep backward compatibility
 #VOL_DEVICE_ID="pi"
@@ -84,88 +89,115 @@ device_image_tweaks() {
 		# Uncomment line below then 'apt-get update' to enable 'apt-get source'
 		#deb-src http://archive.raspberrypi.org/debian/ ${SUITE} main
 	EOF
-
-	log "Fetching rpi-update" "info"
-	curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" https://github.com/raspberrypi/rpi-update/raw/master/rpi-update &&
-		chmod +x "${ROOTFSMNT}/usr/bin/rpi-update"
-	#TODO: Look into moving kernel stuff outside chroot using ROOT/BOOT_PATH to speed things up
-	# ROOT_PATH=${ROOTFSMNT}
-	# BOOT_PATH=${ROOT_PATH}/boot
+	if [[ ${RPI_USE_RPI_UPDATE} = yes ]]; then
+		#TODO: Look into moving kernel stuff outside chroot using ROOT/BOOT_PATH to speed things up
+		# ROOT_PATH=${ROOTFSMNT}
+		# BOOT_PATH=${ROOT_PATH}/boot
+		log "Fetching rpi-update" "info"
+		curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" https://github.com/raspberrypi/rpi-update/raw/master/rpi-update &&
+			chmod +x "${ROOTFSMNT}/usr/bin/rpi-update"
+	fi
 }
 
 # Will be run in chroot (before other things)
 device_chroot_tweaks() {
 	log "Running device_image_tweaks" "ext"
-	# rpi-update needs binutils
-	log "Installing binutils for rpi-update"
-	apt-get update -qq && apt-get -yy install binutils
+	if [[ ${RPI_USE_RPI_UPDATE:yes} == yes ]]; then
+		# rpi-update needs binutils
+		log "Installing binutils for rpi-update"
+		apt-get update -qq && apt-get -yy install binutils
+	fi
 }
 
 # Will be run in chroot - Pre initramfs
 # TODO Try and streamline this!
 device_chroot_tweaks_pre() {
 	## Define parameters
-	declare -A PI_KERNELS=(
-		#[KERNEL_VERSION]="SHA|Branch|Rev"
-		[4.19.86]="b9ecbe8d0e3177afed08c54fc938938100a0b73f|master|1283"
-		[4.19.97]="993f47507f287f5da56495f718c2d0cd05ccbc19|master|1293"
-		[4.19.118]="e1050e94821a70b2e4c72b318d6c6c968552e9a2|master|1311"
-		[5.4.51]="8382ece2b30be0beb87cac7f3b36824f194d01e9|master|1325"
-		[5.4.59]="caf7070cd6cece7e810e6f2661fc65899c58e297|master|1336"
-		[5.4.79]="0642816ed05d31fb37fc8fbbba9e1774b475113f|master|1373"
-		[5.4.81]="453e49bdd87325369b462b40e809d5f3187df21d|master|1379" # Looks like uname_string wasn't updated here..
-		[5.4.83]="b7c8ef64ea24435519f05c38a2238658908c038e|stable|1379"
-		[5.10.3]="da59cb1161dc7c75727ec5c7636f632c52170961|master|1386"
-		[5.10.73]="1597995e94e7ba3cd8866d249e6df1cf9a790e49|master|1470"
-		[5.15.4]="294100a885e17bf5a7f5ac275528ca5ab4c915ba|next|1489"
-	)
-	# Version we want
-	KERNEL_VERSION="5.4.83"
+	if [[ ${RPI_USE_RPI_UPDATE} = yes ]]; then
+		declare -A PI_KERNELS=(
+			#[KERNEL_VERSION]="SHA|Branch|Rev"
+			[4.19.86]="b9ecbe8d0e3177afed08c54fc938938100a0b73f|master|1283"
+			[4.19.97]="993f47507f287f5da56495f718c2d0cd05ccbc19|master|1293"
+			[4.19.118]="e1050e94821a70b2e4c72b318d6c6c968552e9a2|master|1311"
+			[5.4.51]="8382ece2b30be0beb87cac7f3b36824f194d01e9|master|1325"
+			[5.4.59]="caf7070cd6cece7e810e6f2661fc65899c58e297|master|1336"
+			[5.4.79]="0642816ed05d31fb37fc8fbbba9e1774b475113f|master|1373"
+			[5.4.81]="453e49bdd87325369b462b40e809d5f3187df21d|master|1379" # Looks like uname_string wasn't updated here..
+			[5.4.83]="b7c8ef64ea24435519f05c38a2238658908c038e|stable|1379"
+			[5.10.3]="da59cb1161dc7c75727ec5c7636f632c52170961|master|1386"
+			[5.10.73]="1597995e94e7ba3cd8866d249e6df1cf9a790e49|master|1470"
+			[5.15.4]="294100a885e17bf5a7f5ac275528ca5ab4c915ba|next|1489"
+		)
+		# Version we want
+		KERNEL_VERSION="5.4.83"
 
-	# For bleeding edge, check what is the latest on offer
-	# Things *might* break, so you are warned!
-	if [[ ${RPI_USE_LATEST_KERNEL:-no} == yes ]]; then
-		branch=${RPI_KERNEL_BRANCH:-master}
-		log "Using bleeding edge Rpi kernel" "info" "$branch"
-		RpiRepo="https://github.com/raspberrypi/rpi-firmware"
-		RpiRepoApi=${RpiRepo/github.com/api.github.com\/repos}
-		RpiRepoRaw=${RpiRepo/github.com/raw.githubusercontent.com}
-		log "Fetching latest kernel details from ${RpiRepo}"
-		RpiGitSHA=$(curl --silent "${RpiRepoApi}/branches/${branch}")
-		readarray -t RpiCommitDetails <<<"$(jq -r '.commit.sha, .commit.commit.message' <<<"${RpiGitSHA}")"
-		log "Rpi latest kernel -- ${RpiCommitDetails[*]}"
-		# Parse required info from `uname_string`
-		uname_string=$(curl --silent "${RpiRepoRaw}/${RpiCommitDetails[0]}/uname_string")
-		RpiKerVer=$(awk '{print $3}' <<<"${uname_string}")
-		KERNEL_VERSION=${RpiKerVer/+/}
-		RpiKerRev=$(awk '{print $1}' <<<"${uname_string##*#}")
-		PI_KERNELS[${KERNEL_VERSION}]+="${RpiCommitDetails[0]}|${branch}|${RpiKerRev}"
-		# Make life easier
-		log "Using rpi-update SHA:${RpiCommitDetails[0]} Rev:${RpiKerRev}" "${KERNEL_VERSION}"
-		log "[${KERNEL_VERSION}]=\"${RpiCommitDetails[0]}|${branch}|${RpiKerRev}\"" "debug"
+		# For bleeding edge, check what is the latest on offer
+		# Things *might* break, so you are warned!
+		if [[ ${RPI_USE_LATEST_KERNEL:-no} == yes ]]; then
+			branch=${RPI_KERNEL_BRANCH:-master}
+			log "Using bleeding edge Rpi kernel" "info" "$branch"
+			RpiRepo="https://github.com/raspberrypi/rpi-firmware"
+			RpiRepoApi=${RpiRepo/github.com/api.github.com\/repos}
+			RpiRepoRaw=${RpiRepo/github.com/raw.githubusercontent.com}
+			log "Fetching latest kernel details from ${RpiRepo}"
+			RpiGitSHA=$(curl --silent "${RpiRepoApi}/branches/${branch}")
+			readarray -t RpiCommitDetails <<<"$(jq -r '.commit.sha, .commit.commit.message' <<<"${RpiGitSHA}")"
+			log "Rpi latest kernel -- ${RpiCommitDetails[*]}"
+			# Parse required info from `uname_string`
+			uname_string=$(curl --silent "${RpiRepoRaw}/${RpiCommitDetails[0]}/uname_string")
+			RpiKerVer=$(awk '{print $3}' <<<"${uname_string}")
+			KERNEL_VERSION=${RpiKerVer/+/}
+			RpiKerRev=$(awk '{print $1}' <<<"${uname_string##*#}")
+			PI_KERNELS[${KERNEL_VERSION}]+="${RpiCommitDetails[0]}|${branch}|${RpiKerRev}"
+			# Make life easier
+			log "Using rpi-update SHA:${RpiCommitDetails[0]} Rev:${RpiKerRev}" "${KERNEL_VERSION}"
+			log "[${KERNEL_VERSION}]=\"${RpiCommitDetails[0]}|${branch}|${RpiKerRev}\"" "debug"
+		fi
 	fi
 
-	# List of custom firmware -
-	# github archives that can be extracted directly
-	declare -A CustomFirmware=(
-		# [AlloPiano]="https://github.com/allocom/piano-firmware/archive/master.tar.gz" // Should be in tree now
-		[TauDAC]="https://github.com/taudac/modules/archive/rpi-volumio-${KERNEL_VERSION}-taudac-modules.tar.gz"
-		[Bassowl]="https://raw.githubusercontent.com/Darmur/bassowl-hat/master/driver/archives/modules-rpi-${KERNEL_VERSION}-bassowl.tar.gz"
-		[wm8960]="https://raw.githubusercontent.com/hftsai256/wm8960-rpi-modules/main/wm8960-modules-rpi-${KERNEL_VERSION}.tar.gz"
-	)
-
 	### Kernel installation
+	# Exclude 64bit parts on the 32bit installation and vice versa
+	# 	if [[ ${RPI_USE_64BIT} == yes ]]; then
+	# 		cat <<'EOF' >/etc/dpkg/dpkg.cfg.d/00-pi-only-64bit
+	# path-exclude /lib/modules/*+/*
+	# path-exclude /lib/modules/*+
+	# path-exclude /lib/modules/*-v7+/*
+	# path-exclude /lib/modules/*-v7+
+	# path-exclude /lib/modules/*-v7l+/*
+	# path-exclude /lib/modules/*-v7l+
+	# EOF
+	# 	else
+	# 		cat <<'EOF' >/etc/dpkg/dpkg.cfg.d/00-pi-only-32bit
+	# path-exclude /lib/modules/*-v8+/*
+	# path-exclude /lib/modules/*-v8+
+	# path-exclude /boot/kernel8.img
+	# EOF
+	# 	fi
+	if [[ ${RPI_USE_RPI_UPDATE} == yes ]]; then
+		IFS=\| read -r KERNEL_COMMIT KERNEL_BRANCH KERNEL_REV <<<"${PI_KERNELS[$KERNEL_VERSION]}"
+		# using rpi-update to fetch and install kernel and firmware
+		log "Adding kernel ${KERNEL_VERSION} using rpi-update" "info"
+		log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}"
+		#TODO: I don't seem to find a way to fetch only firmware for the Pi4, and not the kernel.. WANT_PI4 isn't granular enough with SKIP_KERNEL
+		# PRUNE_MODULES=1
+		echo y | SKIP_BACKUP=1 WANT_PI4=1 SKIP_CHECK_PARTITION=1 UPDATE_SELF=0 BRANCH=${KERNEL_BRANCH} /usr/bin/rpi-update "${KERNEL_COMMIT}"
+	else
+		log "Installing Kernel via default packages"
+		# raspberrypi-bootloader
+		apt-get install -yq raspberrypi-kernel
+	fi
+
+	## Reconfirm our kernel version
+	#shellcheck disable=SC2012 #We know it's going to be alphanumeric only!
+	mapfile -t kver < <(ls -t /lib/modules | sort)
+	log "Found ${#kver[@]} kernel version(s)" "${kver[*]}"
+	[[ ${kver[0]%%-*} != "${KERNEL_VERSION}" ]] && [[ ${RPI_USE_RPI_UPDATE} == yes ]] &&
+		log "Installed kernel doesn't match requested version!" "wrn" "${kver[0]%%-*} != ${KERNEL_VERSION}"
+
+	KERNEL_VERSION=${kver[0]%%-*}
 	IFS=\. read -ra KERNEL_SEMVER <<<"${KERNEL_VERSION}"
-	IFS=\| read -r KERNEL_COMMIT KERNEL_BRANCH KERNEL_REV <<<"${PI_KERNELS[$KERNEL_VERSION]}"
-
-	# using rpi-update to fetch and install kernel and firmware
-	log "Adding kernel ${KERNEL_VERSION} using rpi-update" "info"
-	log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}"
-	#TODO: I don't seem to find a way to fetch only firmware for the Pi4, and not the kernel.. WANT_PI4 isn't granular enough with SKIP_KERNEL
-	# PRUNE_MODULES=1
-	echo y | SKIP_BACKUP=1 WANT_PI4=1 SKIP_CHECK_PARTITION=1 UPDATE_SELF=0 BRANCH=${KERNEL_BRANCH} /usr/bin/rpi-update "${KERNEL_COMMIT}"
-
-	if [[ -d "/lib/modules/${KERNEL_VERSION}-v8+" ]]; then
+	if [[ ${RPI_USE_64BIT} == no ]] && [[ -d "/lib/modules/${KERNEL_VERSION}-v8+" ]]; then
+		log "Cleaning up superfluous modules"
 		log "Removing v8+ (pi4) Kernels" "info"
 		rm /boot/kernel8.img
 		rm -rf "/lib/modules/${KERNEL_VERSION}-v8+"
@@ -184,7 +216,16 @@ device_chroot_tweaks_pre() {
 		Pin: release *
 		Pin-Priority: -1
 	EOF
-	log "Finished Kernel installation" "okay"
+	log "Finished Kernel installation" "okay" "${KERNEL_VERSION}"
+
+	# List of custom firmware -
+	# github archives that can be extracted directly
+	declare -A CustomFirmware=(
+		# [AlloPiano]="https://github.com/allocom/piano-firmware/archive/master.tar.gz" // Should be in tree now
+		[TauDAC]="https://github.com/taudac/modules/archive/rpi-volumio-${KERNEL_VERSION}-taudac-modules.tar.gz"
+		[Bassowl]="https://raw.githubusercontent.com/Darmur/bassowl-hat/master/driver/archives/modules-rpi-${KERNEL_VERSION}-bassowl.tar.gz"
+		[wm8960]="https://raw.githubusercontent.com/hftsai256/wm8960-rpi-modules/main/wm8960-modules-rpi-${KERNEL_VERSION}.tar.gz"
+	)
 
 	### Other Rpi specific stuff
 	## Fetch NodeJS for armv6
@@ -235,7 +276,11 @@ device_chroot_tweaks_pre() {
 			rm "$key.tar.gz"
 			continue
 		}
-		tar --strip-components 1 --exclude "*.hash" --exclude "*.md" -xf "$key.tar.gz"
+		TarArgs=("--strip-components=1" "--exclude" "*.hash" "--exclude" "*.md")
+		if [[ ${RPI_USE_64BIT} == yes ]]; then
+			TarArgs+=("--wildcards" "lib/modules/*-v8")
+		fi
+		tar -xf "$key.tar.gz" "${TAR_ARGS[@]}"
 		rm "$key.tar.gz"
 	done
 
@@ -364,7 +409,7 @@ device_chroot_tweaks_pre() {
 	# so use hacky semver check here in the odd case we want to go back to a lower kernel
 	[[ ${KERNEL_SEMVER[0]} == 5 ]] && compat_alsa=0 || compat_alsa=1
 	# https://github.com/raspberrypi/linux/commit/88debfb15b3ac9059b72dc1ebc5b82f3394cac87
-	if [[ ${KERNEL_SEMVER[0]} == 5 ]] && [[ ${KERNEL_SEMVER[2]} -le 4 ]] && [[ ${KERNEL_SEMVER[2]} -le 79 ]]; then
+	if [[ ${KERNEL_SEMVER[0]} == 5 ]] && [[ ${KERNEL_SEMVER[1]} -le 4 ]] && [[ ${KERNEL_SEMVER[2]} -le 79 ]]; then
 		kernel_params+=("snd_bcm2835.enable_headphones=1")
 	fi
 	kernel_params+=("snd-bcm2835.enable_compat_alsa=${compat_alsa}" "snd_bcm2835.enable_hdmi=1")
@@ -386,6 +431,16 @@ device_chroot_tweaks_pre() {
 			sed -i -e "s/BOOT_UART=0/BOOT_UART=1/" /boot/bootcode.bin
 		fi
 	fi
+	if [[ ${RPI_USE_64BIT} == yes ]]; then
+		log "Signaling 64bit kernel"
+		cat <<-EOF >>/boot/config.txt
+			# Enable DRM VC4 V3D driver
+			dtoverlay=vc4-kms-v3d
+			max_framebuffers=2
+			# Run in 64-bit mode
+			arm_64bit=1
+		EOF
+	fi
 
 	kernel_params+=("${KERNEL_LOGLEVEL}")
 	log "Setting ${#kernel_params[@]} Kernel params:" "${kernel_params[*]}"
@@ -394,11 +449,15 @@ device_chroot_tweaks_pre() {
 	EOF
 
 	# Rerun depmod for new drivers
-	log "Finalising drivers installation with depmod on ${KERNEL_VERSION}+,-v7+ and -v7l+"
-	depmod "${KERNEL_VERSION}+"     # Pi 1, Zero, Compute Module
-	depmod "${KERNEL_VERSION}-v7+"  # Pi 2,3 CM3
-	depmod "${KERNEL_VERSION}-v7l+" # Pi4
-
+	# https://www.raspberrypi.com/documentation/computers/linux_kernel.html
+	# + 		--> Pi 1,Zero,ZeroW, and CM 1
+	# -v7+  --> Pi 2,3,3+,Zero 2W, CM3, and CM3+
+	# -v7l+ --> Pi 4,400, CM 4 (32bit)
+	# -v8+  --> Pi 3,3+,4,400, Zero 2W, CM 3,3+,4 (64bit)
+	for ver in "${kver[@]}"; do
+		log "Running depmod" "${ver}"
+		depmod "${ver}"
+	done
 	log "Raspi Kernel and Modules installed" "okay"
 
 }
