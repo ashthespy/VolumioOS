@@ -80,6 +80,7 @@ unmount_chroot() {
 
 exit_error() {
   log "Build script failed!!" "err"
+  log "Error stack $(printf '[%s] <= ' "${FUNCNAME[@]:1}")" "err" "$(caller)"
   # Check if there are any mounts that need cleaning up
   # If dev is mounted, the rest should also be mounted (right?)
   if isMounted "${ROOTFS}/dev"; then
@@ -87,7 +88,7 @@ exit_error() {
   fi
 }
 
-trap exit_error INT ERR
+trap 'exit_error ${LINENO}' INT ERR
 
 function check_os_release() {
   os_release="${ROOTFS}/etc/os-release"
@@ -564,7 +565,10 @@ if [[ -n "${DEVICE}" ]]; then
       url=${CUSTOM_PKGS[$key]}
       [[ "${url}" != *".deb"$ ]] && url="${url}_${BUILD}.deb"
       # log "Fetching ${key} from ${url}"
-      wget -nv "${url}" -P "${ROOTFS}/volumio/customPkgs/" || log "${key} not found for ${BUILD}!" "err"
+      wget -nv "${url}" -P "${ROOTFS}/volumio/customPkgs/" || {
+        log "${key} wasn't successful for ${BUILD}!" "err"
+        exit_error ${LINENO} && exit 1
+      }
     done
   else
     log "No customPkgs added!" "wrn"

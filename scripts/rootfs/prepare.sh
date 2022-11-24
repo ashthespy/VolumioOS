@@ -30,7 +30,7 @@ if [[ ${USE_EXTRA_REPOS:-no} == yes ]] && [[ ${BASE} == "Debian" ]]; then
 		deb ${APTSOURCE[${BASE}]} ${SUITE}-backports main contrib non-free
 		#deb-src ${APTSOURCE[${BASE}]} ${SUITE}-backports main contrib non-free
 
-		deb http://security.debian.org/debian-security ${SUITE}/updates main contrib non-free
-		#deb-src http://security.debian.org/debian-security ${SUITE}/updates main contrib non-free
+		deb http://security.debian.org/debian-security ${SUITE}-security main contrib non-free
+		#deb-src http://security.debian.org/debian-security ${SUITE}-security main contrib non-free
 	EOF
 fi

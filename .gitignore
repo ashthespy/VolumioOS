@@ -3,6 +3,7 @@ build
 logs
 platform-*
 myVolumioSDK
+arm-raspbian.conf
 
 # We don't need logs and image artifacts
 *.log

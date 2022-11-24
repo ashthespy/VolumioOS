@@ -22,5 +22,6 @@ export USE_NODE_ARMV6=${USE_NODE_ARMV6:-yes}              # Use armv6 based Node
 export RPI_USE_LATEST_KERNEL=${RPI_USE_LATEST_KERNEL:-no} # Fetch latest Pi kernel
 
 # Misc
-export USE_BUILD_TESTS=${USE_BUILD_TESTS:-no} # Run some simple build framework tests for debugging
-export APT_CACHE=${APT_CACHE:-}               # URL of local cache of the Debian mirror
+export EXIT_BUILD_ON_ERROR=${EXIT_BUILD_ON_ERROR:-yes} # Exit the build on any error level log
+export USE_BUILD_TESTS=${USE_BUILD_TESTS:-no}          # Run some simple build framework tests for debugging
+export APT_CACHE=${APT_CACHE:-}                        # URL of local cache of the Debian mirror
