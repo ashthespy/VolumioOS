@@ -141,10 +141,15 @@ else
   if [[ -d ${PATCH} ]]; then
     pushd "${PATCH}"
     for script in "${patch_scrips[@]}"; do
-      log "Running ${script}" "ext" "${PATCH}"
-      bash "${script}"
-      status=$?
-      [[ ${status} -ne 0 ]] && log "${script} failed with ${status}" "err" "${PATCH}"
+      if [[ -f ${script} ]]; then
+        log "Running ${script}" "ext" "${PATCH}"
+        bash "${script}"
+        status=$?
+        [[ ${status} -ne 0 ]] && log "${script} failed with ${status}" "err" "${PATCH}"
+      else
+        log "Patch script ${script} not found!" "wrn"
+        ls -- *.sh
+      fi
     done
     popd
   else
