@@ -8,8 +8,9 @@ DEVICE_STATUS="T"       # First letter (Planned|Test|Maintenance)
 BASE="Raspbian"
 ARCH="armhf"
 BUILD="arm"
-if [[ ${RPI_USE_64BIT:no} == yes ]]; then
+if [[ ${RPI_USE_64BIT:=no} == yes ]]; then
 	# Base system
+	log "Building Rpi 64bit image!" "wrn"
 	BASE="Debian"
 	ARCH="arm64"
 	BUILD="armv8"
@@ -39,16 +40,9 @@ INIT_TYPE="init" # init.{x86/nextarm/nextarm_tvbox}
 # Modules that will be added to intramfs
 MODULES=("overlay" "squashfs")
 # Packages that will be installed
-PACKAGES=(# Bluetooth packages
-	"bluez" "bluez-firmware" "pi-bluetooth"
-	# Foundation stuff
-	"raspberrypi-sys-mods" "libraspberrypi0" "rpi-eeprom"
+PACKAGES=(
 	# GPIO stuff
 	# "wiringpi"
-	# Boot splash
-	"plymouth" "plymouth-themes"
-	# Wireless firmware
-	"firmware-misc-nonfree" "firmware-atheros" "firmware-ralink" "firmware-realtek" "firmware-brcm80211"
 )
 
 ### Device customisation
@@ -127,9 +121,10 @@ device_chroot_tweaks_pre() {
 			[5.10.3]="da59cb1161dc7c75727ec5c7636f632c52170961|master|1386"
 			[5.10.73]="1597995e94e7ba3cd8866d249e6df1cf9a790e49|master|1470"
 			[5.15.4]="294100a885e17bf5a7f5ac275528ca5ab4c915ba|next|1489"
+			[6.1.14]="efa803ad87123407ca89efc9546bcf6a6696e00d|master|1633"
 		)
 		# Version we want
-		KERNEL_VERSION="5.4.83"
+		KERNEL_VERSION="6.1.14"
 
 		# For bleeding edge, check what is the latest on offer
 		# Things *might* break, so you are warned!
@@ -180,7 +175,9 @@ device_chroot_tweaks_pre() {
 		log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}"
 		#TODO: I don't seem to find a way to fetch only firmware for the Pi4, and not the kernel.. WANT_PI4 isn't granular enough with SKIP_KERNEL
 		# PRUNE_MODULES=1
-		echo y | SKIP_BACKUP=1 WANT_PI4=1 SKIP_CHECK_PARTITION=1 UPDATE_SELF=0 BRANCH=${KERNEL_BRANCH} /usr/bin/rpi-update "${KERNEL_COMMIT}"
+		RpiUpdate_args=("SKIP_BACKUP=1" "SKIP_CHECK_PARTITION=1" "UPDATE_SELF=0" "WANT_PI4=1" BRANCH="${KERNEL_BRANCH}")
+		[[ ${RPI_USE_64BIT} == yes ]] && RpiUpdate_args+=("WANT_64BIT=1") || RpiUpdate_args+=("WANT_32BIT=1")
+		echo y | env "${RpiUpdate_args[@]}" /usr/bin/rpi-update "${KERNEL_COMMIT}"
 	else
 		log "Installing Kernel via default packages"
 		# raspberrypi-bootloader
@@ -191,10 +188,10 @@ device_chroot_tweaks_pre() {
 	#shellcheck disable=SC2012 #We know it's going to be alphanumeric only!
 	mapfile -t kver < <(ls -t /lib/modules | sort)
 	log "Found ${#kver[@]} kernel version(s)" "${kver[*]}"
-	[[ ${kver[0]%%-*} != "${KERNEL_VERSION}" ]] && [[ ${RPI_USE_RPI_UPDATE} == yes ]] &&
-		log "Installed kernel doesn't match requested version!" "wrn" "${kver[0]%%-*} != ${KERNEL_VERSION}"
-
-	KERNEL_VERSION=${kver[0]%%-*}
+	ksemver=${kver[0]%%-*} && ksemver=${ksemver%%+*}
+	[[ ${ksemver} != "${KERNEL_VERSION}" ]] && [[ ${RPI_USE_RPI_UPDATE} == yes ]] &&
+		log "Installed kernel doesn't match requested version!" "wrn" "${ksemver} != ${KERNEL_VERSION}"
+	KERNEL_VERSION=${ksemver}
 	IFS=\. read -ra KERNEL_SEMVER <<<"${KERNEL_VERSION}"
 	if [[ ${RPI_USE_64BIT} == no ]] && [[ -d "/lib/modules/${KERNEL_VERSION}-v8+" ]]; then
 		log "Cleaning up superfluous modules"
@@ -277,9 +274,7 @@ device_chroot_tweaks_pre() {
 			continue
 		}
 		TarArgs=("--strip-components=1" "--exclude" "*.hash" "--exclude" "*.md")
-		if [[ ${RPI_USE_64BIT} == yes ]]; then
-			TarArgs+=("--wildcards" "lib/modules/*-v8")
-		fi
+		[[ ${RPI_USE_64BIT} == yes ]] && TarArgs+=("--wildcards" "lib/modules/*-v8")
 		tar -xf "$key.tar.gz" "${TAR_ARGS[@]}"
 		rm "$key.tar.gz"
 	done
@@ -324,10 +319,12 @@ device_chroot_tweaks_pre() {
 	groupadd -f --system gpio
 	groupadd -f --system spi
 
-	log "Disabling sshswitch"
-	rm /etc/sudoers.d/010_pi-nopasswd
-	unlink /etc/systemd/system/multi-user.target.wants/sshswitch.service
-	rm /lib/systemd/system/sshswitch.service
+	if [[ -f /etc/systemd/system/multi-user.target.wants/sshswitch.service ]]; then
+		log "Disabling sshswitch"
+		rm /etc/sudoers.d/010_pi-nopasswd
+		unlink /etc/systemd/system/multi-user.target.wants/sshswitch.service
+		rm /lib/systemd/system/sshswitch.service
+	fi
 
 	log "Changing external ethX priority"
 	# As built-in eth _is_ on USB (smsc95xx or lan78xx drivers)
@@ -450,7 +447,7 @@ device_chroot_tweaks_pre() {
 
 	# Rerun depmod for new drivers
 	# https://www.raspberrypi.com/documentation/computers/linux_kernel.html
-	# + 		--> Pi 1,Zero,ZeroW, and CM 1
+	# + 	--> Pi 1,Zero,ZeroW, and CM 1
 	# -v7+  --> Pi 2,3,3+,Zero 2W, CM3, and CM3+
 	# -v7l+ --> Pi 4,400, CM 4 (32bit)
 	# -v8+  --> Pi 3,3+,4,400, Zero 2W, CM 3,3+,4 (64bit)
