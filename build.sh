@@ -319,9 +319,9 @@ if [[ -n "${BUILD}" ]]; then
   BASECONF=recipes/base/VolumioBase.conf
 
   # Check if we need to update our Multistrap config
-  if ! grep -q ${SUITE} "${BASECONF}"; then
+  if ! grep -q "${SUITE}" "${BASECONF}"; then
     log "Updating Multistrap config suite" "wrn" "${SUITE}"
-    log "Please check in new config post testing" "wrn" ""${BASECONF%%.*}_${SUITE}.conf""
+    log "Please check in new config post testing" "wrn" "${BASECONF%%.*}_${SUITE}.conf"
     sed "s|\(^suite=\).*$|\1${SUITE}|g" "${BASECONF}" >>"${BASECONF%%.*}_${SUITE}.conf"
   fi
 
@@ -486,7 +486,7 @@ if [[ -n "${DEVICE}" ]]; then
   ## Add in our version details
   check_os_release
 
-  # Patching for advanved Volumio builds
+  # Patching for advanced Volumio builds  
   if [[ -n "${PATCH}" ]]; then
     log "Copying Patch ${SDK_PATH-.}/${PATCH} to Rootfs"
     cp -rp "${SDK_PATH-.}/${PATCH}" "${ROOTFS}/"
@@ -537,7 +537,7 @@ if [[ -n "${DEVICE}" ]]; then
   if [[ ${USE_LOCAL_NODE_MODULES} == yes ]]; then
     log "Extracting node_modules for Node v${NODE_VERSION}"
     tar xf "${LOCAL_MODULES_DIR}/node_modules_${BUILD}"_v${NODE_VERSION%%.*}.*.tar.* -C "${ROOTFS}/volumio"
-    ls "${ROOTFS}/volumio/node_modules"
+    # ls "${ROOTFS}/volumio/node_modules"
   else
     # Current Volumio repo knows only {arm|x86} which is conveniently the same length
     # TODO: Consolidate the naming scheme for node modules - %{BUILD}-v${NODE_VERSION}.tar.xz
