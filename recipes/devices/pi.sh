@@ -45,6 +45,25 @@ PACKAGES=(
 	# "wiringpi"
 )
 
+# Pi Specific
+declare -A PI_KERNELS=(
+	#[KERNEL_VERSION]="SHA|Branch|Rev"
+	[4.19.86]="b9ecbe8d0e3177afed08c54fc938938100a0b73f|master|1283"
+	[4.19.97]="993f47507f287f5da56495f718c2d0cd05ccbc19|master|1293"
+	[4.19.118]="e1050e94821a70b2e4c72b318d6c6c968552e9a2|master|1311"
+	[5.4.51]="8382ece2b30be0beb87cac7f3b36824f194d01e9|master|1325"
+	[5.4.59]="caf7070cd6cece7e810e6f2661fc65899c58e297|master|1336"
+	[5.4.79]="0642816ed05d31fb37fc8fbbba9e1774b475113f|master|1373"
+	[5.4.81]="453e49bdd87325369b462b40e809d5f3187df21d|master|1379" # Looks like uname_string wasn't updated here..
+	[5.4.83]="b7c8ef64ea24435519f05c38a2238658908c038e|stable|1379"
+	[5.10.3]="da59cb1161dc7c75727ec5c7636f632c52170961|master|1386"
+	[5.10.73]="1597995e94e7ba3cd8866d249e6df1cf9a790e49|master|1470"
+	[5.15.4]="294100a885e17bf5a7f5ac275528ca5ab4c915ba|next|1489"
+	[6.1.14]="efa803ad87123407ca89efc9546bcf6a6696e00d|master|1633"
+)
+# Version we want
+KERNEL_VERSION="6.1.14"
+
 ### Device customisation
 # Copy the device specific files (Image/DTS/etc..)
 write_device_files() {
@@ -90,41 +109,6 @@ device_image_tweaks() {
 		log "Fetching rpi-update" "info"
 		curl -L --output "${ROOTFSMNT}/usr/bin/rpi-update" https://github.com/raspberrypi/rpi-update/raw/master/rpi-update &&
 			chmod +x "${ROOTFSMNT}/usr/bin/rpi-update"
-	fi
-}
-
-# Will be run in chroot (before other things)
-device_chroot_tweaks() {
-	log "Running device_image_tweaks" "ext"
-	if [[ ${RPI_USE_RPI_UPDATE:yes} == yes ]]; then
-		# rpi-update needs binutils
-		log "Installing binutils for rpi-update"
-		apt-get update -qq && apt-get -yy install binutils
-	fi
-}
-
-# Will be run in chroot - Pre initramfs
-# TODO Try and streamline this!
-device_chroot_tweaks_pre() {
-	## Define parameters
-	if [[ ${RPI_USE_RPI_UPDATE} = yes ]]; then
-		declare -A PI_KERNELS=(
-			#[KERNEL_VERSION]="SHA|Branch|Rev"
-			[4.19.86]="b9ecbe8d0e3177afed08c54fc938938100a0b73f|master|1283"
-			[4.19.97]="993f47507f287f5da56495f718c2d0cd05ccbc19|master|1293"
-			[4.19.118]="e1050e94821a70b2e4c72b318d6c6c968552e9a2|master|1311"
-			[5.4.51]="8382ece2b30be0beb87cac7f3b36824f194d01e9|master|1325"
-			[5.4.59]="caf7070cd6cece7e810e6f2661fc65899c58e297|master|1336"
-			[5.4.79]="0642816ed05d31fb37fc8fbbba9e1774b475113f|master|1373"
-			[5.4.81]="453e49bdd87325369b462b40e809d5f3187df21d|master|1379" # Looks like uname_string wasn't updated here..
-			[5.4.83]="b7c8ef64ea24435519f05c38a2238658908c038e|stable|1379"
-			[5.10.3]="da59cb1161dc7c75727ec5c7636f632c52170961|master|1386"
-			[5.10.73]="1597995e94e7ba3cd8866d249e6df1cf9a790e49|master|1470"
-			[5.15.4]="294100a885e17bf5a7f5ac275528ca5ab4c915ba|next|1489"
-			[6.1.14]="efa803ad87123407ca89efc9546bcf6a6696e00d|master|1633"
-		)
-		# Version we want
-		KERNEL_VERSION="6.1.14"
 
 		# For bleeding edge, check what is the latest on offer
 		# Things *might* break, so you are warned!
@@ -148,37 +132,40 @@ device_chroot_tweaks_pre() {
 			log "Using rpi-update SHA:${RpiCommitDetails[0]} Rev:${RpiKerRev}" "${KERNEL_VERSION}"
 			log "[${KERNEL_VERSION}]=\"${RpiCommitDetails[0]}|${branch}|${RpiKerRev}\"" "debug"
 		fi
-	fi
 
-	### Kernel installation
-	# Exclude 64bit parts on the 32bit installation and vice versa
-	# 	if [[ ${RPI_USE_64BIT} == yes ]]; then
-	# 		cat <<'EOF' >/etc/dpkg/dpkg.cfg.d/00-pi-only-64bit
-	# path-exclude /lib/modules/*+/*
-	# path-exclude /lib/modules/*+
-	# path-exclude /lib/modules/*-v7+/*
-	# path-exclude /lib/modules/*-v7+
-	# path-exclude /lib/modules/*-v7l+/*
-	# path-exclude /lib/modules/*-v7l+
-	# EOF
-	# 	else
-	# 		cat <<'EOF' >/etc/dpkg/dpkg.cfg.d/00-pi-only-32bit
-	# path-exclude /lib/modules/*-v8+/*
-	# path-exclude /lib/modules/*-v8+
-	# path-exclude /boot/kernel8.img
-	# EOF
-	# 	fi
-	if [[ ${RPI_USE_RPI_UPDATE} == yes ]]; then
 		IFS=\| read -r KERNEL_COMMIT KERNEL_BRANCH KERNEL_REV <<<"${PI_KERNELS[$KERNEL_VERSION]}"
 		# using rpi-update to fetch and install kernel and firmware
 		log "Adding kernel ${KERNEL_VERSION} using rpi-update" "info"
 		log "Fetching SHA: ${KERNEL_COMMIT} from branch: ${KERNEL_BRANCH}"
 		#TODO: I don't seem to find a way to fetch only firmware for the Pi4, and not the kernel.. WANT_PI4 isn't granular enough with SKIP_KERNEL
+		# Fixed with https://github.com/raspberrypi/rpi-update/pull/4
 		# PRUNE_MODULES=1
-		RpiUpdate_args=("SKIP_BACKUP=1" "SKIP_CHECK_PARTITION=1" "UPDATE_SELF=0" "WANT_PI4=1" BRANCH="${KERNEL_BRANCH}")
+		RpiUpdate_args=("SKIP_WARNING=1" "SKIP_BACKUP=1" "SKIP_CHECK_PARTITION=1"
+			"UPDATE_SELF=0" "WANT_PI4=1" "BRANCH=${KERNEL_BRANCH}"
+			"ROOT_PATH=${ROOTFSMNT}" "BOOT_PATH=${ROOTFSMNT}/boot"
+		)
 		[[ ${RPI_USE_64BIT} == yes ]] && RpiUpdate_args+=("WANT_64BIT=1") || RpiUpdate_args+=("WANT_32BIT=1")
-		echo y | env "${RpiUpdate_args[@]}" /usr/bin/rpi-update "${KERNEL_COMMIT}"
-	else
+		env "${RpiUpdate_args[@]}" "${ROOTFSMNT}"/usr/bin/rpi-update "${KERNEL_COMMIT}"
+	fi
+}
+
+# Will be run in chroot (before other things)
+device_chroot_tweaks() {
+	:
+	# log "Running device_image_tweaks" "ext"
+	# if [[ ${RPI_USE_RPI_UPDATE:yes} == yes ]]; then
+	# 	# rpi-update needs binutils
+	# 	log "Installing binutils for rpi-update"
+	# 	apt-get update -qq && apt-get -yy install binutils
+	# fi
+}
+
+# Will be run in chroot - Pre initramfs
+# TODO Try and streamline this!
+device_chroot_tweaks_pre() {
+	## Define parameters
+	### Kernel installation
+	if [[ ${RPI_USE_RPI_UPDATE} == no ]]; then
 		log "Installing Kernel via default packages"
 		# raspberrypi-bootloader
 		apt-get install -yq raspberrypi-kernel
